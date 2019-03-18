@@ -23,29 +23,95 @@ import com.github.mishaninss.uidriver.Arma;
 import com.github.mishaninss.uidriver.webdriver.IWebDriverFactory;
 import com.jayway.restassured.RestAssured;
 import com.jayway.restassured.http.ContentType;
+import com.jayway.restassured.specification.RequestSpecification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.temporal.TemporalUnit;
+import java.util.concurrent.TimeUnit;
+
+import static org.awaitility.Awaitility.await;
 
 @Component
 public class SelenoidClient implements ISelenoidClient {
+    @Reporter
+    protected IReporter reporter;
     @Autowired
     private Arma arma;
     @Autowired
     private WebDriverProperties webDriverProperties;
     @Autowired
     private IWebDriverFactory webDriverFactory;
-    @Reporter
-    protected IReporter reporter;
+
+    private RequestSpecification request() {
+        return RestAssured.given()
+                .baseUri(getSelenoidUrl())
+                .log().all(true);
+    }
+
+    private String getSelenoidUrl() {
+        return webDriverProperties.driver().gridUrl.replace("/wd/hub", "");
+    }
+
+
+    public byte[] getVideoFile(String fileName) {
+        try {
+            return request()
+                    .pathParam("fileName", fileName)
+                    .expect()
+                    .statusCode(200)
+                    .log().all(true)
+                    .get("/video/{fileName}.mp4")
+                    .andReturn()
+                    .body().asByteArray();
+        } catch (Throwable e) {
+            throw new RuntimeException(String.format("Could not get video file [%s]", fileName));
+        }
+    }
+
+    public byte[] getVideoFile(String fileName, int timeout, TemporalUnit timeUnit) {
+        return arma.waiting().waitForCondition(() -> {
+            try {
+                return getVideoFile(fileName);
+            } catch (Exception ex) {
+                reporter.ignoredException(ex);
+            }
+            return null;
+        }, timeout, timeUnit);
+    }
+
+    public void deleteVideoFile(String fileName) {
+        try {
+            request()
+                    .pathParam("fileName", fileName)
+                    .expect()
+                    .statusCode(200)
+                    .log().all(true)
+                    .delete("/video/{fileName}.mp4");
+        } catch (Throwable e) {
+            throw new RuntimeException(String.format("Could not get video file [%s]", fileName));
+        }
+    }
+
+    public void deleteVideoFile(String fileName, int timeout, TimeUnit timeUnit) {
+        await()
+                .atMost(timeout, timeUnit)
+                .until(() -> {
+                    try {
+                        deleteVideoFile(fileName);
+                        return true;
+                    } catch (Exception ex) {
+                        reporter.ignoredException(ex);
+                    }
+                    return false;
+                });
+    }
 
     public byte[] getDownloadedFile(String fileName) {
         String sessionId = webDriverFactory.getSessionId();
 
         try {
-            return RestAssured.given()
-                    .baseUri(webDriverProperties.driver().gridUrl.replace("/wd/hub", ""))
-                    .log().all(true)
+            return request()
                     .pathParam("sessionId", sessionId)
                     .pathParam("fileName", fileName)
                     .expect()
@@ -62,9 +128,7 @@ public class SelenoidClient implements ISelenoidClient {
     public String getDownloadedFilesList() {
         String sessionId = webDriverFactory.getSessionId();
 
-        return RestAssured.given()
-                .baseUri(webDriverProperties.driver().gridUrl.replace("/wd/hub", ""))
-                .log().all(true)
+        return request()
                 .pathParam("sessionId", sessionId)
                 .expect()
                 .statusCode(200)
