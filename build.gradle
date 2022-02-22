@@ -1,0 +1,9 @@
+apply from: '../arma/build-commons.gradle'
+
+description = """"""
+
+dependencies {
+    implementation group: 'com.github.mishaninss', name: 'arma-ui-webdriver', version: armaVersion
+    implementation group: 'io.rest-assured', name: 'rest-assured', version: '4.3.0'
+    implementation group: 'org.jsoup', name: 'jsoup', version: '1.11.3'
+}
