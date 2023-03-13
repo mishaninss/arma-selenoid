@@ -14,14 +14,12 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import static org.awaitility.Awaitility.await;
 
 @Component
-@Primary
-public class SelenoidClient implements ISelenoidClient {
+public class MoonClient implements ISelenoidClient {
 
   @Reporter
   protected IReporter reporter;
@@ -44,7 +42,7 @@ public class SelenoidClient implements ISelenoidClient {
   }
 
   private String getSelenoidUrl() {
-    return webDriverProperties.driver().gridUrl.replace("/wd/hub", "");
+    return webDriverProperties.driver().gridUrl;
   }
 
   @Override
@@ -127,7 +125,7 @@ public class SelenoidClient implements ISelenoidClient {
           .statusCode(200)
           .log().all(true)
           .when()
-          .get("/download/{sessionId}/{fileName}")
+          .get("/session/{sessionId}/aerokube/download/{fileName}")
           .andReturn()
           .body().asByteArray();
     } catch (Throwable e) {
@@ -148,19 +146,21 @@ public class SelenoidClient implements ISelenoidClient {
         .contentType(ContentType.HTML)
         .log().all(true)
         .when()
-        .get("/download/{sessionId}")
+        .get("/session/{sessionId}/aerokube/download")
         .andReturn().body().asString();
   }
 
   @Override
   public byte[] getDownloadedFile(String fileName, int timeout, TemporalUnit timeUnit) {
     return waitingDriver.waitForCondition(() -> {
-      try {
-        return getDownloadedFile(fileName);
-      } catch (Exception ex) {
-        reporter.ignoredException(ex);
-      }
-      return null;
-    }, timeout, timeUnit);
+          try {
+            return getDownloadedFile(fileName);
+          } catch (Exception ex) {
+            reporter.ignoredException(ex);
+          }
+          return null;
+        }, timeout, timeUnit,
+        String.format("Could not get downloaded file [%s] from Selenoid session [%s]", fileName,
+            webDriverFactory.getSessionId()));
   }
 }
