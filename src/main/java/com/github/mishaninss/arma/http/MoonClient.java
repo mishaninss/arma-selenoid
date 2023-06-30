@@ -143,7 +143,7 @@ public class MoonClient implements ISelenoidClient {
         .pathParam("sessionId", sessionId)
         .expect()
         .statusCode(200)
-        .contentType(ContentType.HTML)
+        .contentType(ContentType.JSON)
         .log().all(true)
         .when()
         .get("/session/{sessionId}/aerokube/download")
